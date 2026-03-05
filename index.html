@@ -231,7 +231,7 @@
                     <select id="flt-rev-status" onchange="renderReviewCards()" class="border p-2 rounded text-sm min-w-[150px]">
                        <option value="ALL">Semua Status</option>
                        <option value="Verified">Sudah Diverifikasi</option>
-                       <option value="Menunggu">Menunggu / Sebagian</option>
+                       <option value="Menunggu">Menunggu Review</option>
                        <option value="Ditolak">Ditolak</option>
                        <option value="Belum Upload">Belum Diupload</option>
                     </select>
@@ -282,7 +282,6 @@
                        <option value="ALL">Semua Status</option>
                        <option value="Verified">Sudah Diverifikasi</option>
                        <option value="Sudah Upload">Sudah Upload</option>
-                       <option value="Direview Sebagian">Direview Sebagian</option>
                        <option value="Ditolak">Ditolak</option>
                        <option value="Permintaan">Permintaan / Belum Upload</option>
                     </select>
@@ -413,11 +412,15 @@
              <label class="w-1/3 text-sm font-bold text-stone-600">Role</label>
              <select id="input-u-role" class="w-2/3 border p-2 rounded focus:outline-none focus:border-orange-500">
                 <option value="superadmin">Superadmin</option>
-                <option value="pimpinan">Pimpinan</option>
-                <option value="operator_kul">KUL</option>
-                <option value="operator_sdmparmas">SDM & Parmas</option>
-                <option value="operator_tekhum">Tekhum</option>
-                <option value="operator_rendatin">Rendatin / Admin</option>
+                <option value="komisioner">Komisioner</option>
+                <option value="kasubbag_kul">Kasubbag KUL</option>
+                <option value="kasubbag_sdmparmas">Kasubbag SDM & Parmas</option>
+                <option value="kasubbag_tekhum">Kasubbag Tekhum</option>
+                <option value="kasubbag_rendatin">Kasubbag Rendatin</option>
+                <option value="operator_kul">Operator KUL</option>
+                <option value="operator_sdmparmas">Operator SDM & Parmas</option>
+                <option value="operator_tekhum">Operator Tekhum</option>
+                <option value="operator_rendatin">Operator Rendatin</option>
              </select>
           </div>
 
@@ -638,9 +641,9 @@
         document.getElementById('page-title').innerText = title;
         highlightMenu(menuId);
 
-        // Access Check for User Management
+        // Access Check for User Management (Hanya Superadmin)
         if(id === 'tab-profile') {
-           if(currentRole === 'superadmin' || currentRole === 'operator_rendatin') {
+           if(currentRole === 'superadmin') {
                document.getElementById('admin-user-management').classList.remove('hidden');
                loadUsers();
            } else {
@@ -650,7 +653,7 @@
       }
 
       function enterPanel() {
-        if (currentRole === 'superadmin' || currentRole === 'pimpinan') showTab('tab-review');
+        if (currentRole === 'superadmin' || currentRole === 'komisioner' || currentRole.includes('kasubbag')) showTab('tab-review');
         else showTab('tab-data');
       }
 
@@ -692,18 +695,33 @@
           document.getElementById('panel-masuk-container').classList.remove('hidden');
 
           document.getElementById('menu-profile').classList.remove('hidden');
-          document.getElementById('menu-review').classList.remove('hidden'); // Available for all
-
+          
           // ROLE: Superadmin
           if(res.role === 'superadmin') {
+             document.getElementById('menu-review').classList.remove('hidden');
              document.getElementById('menu-upload').classList.remove('hidden');
              document.getElementById('menu-request').classList.remove('hidden');
              document.getElementById('menu-data').classList.remove('hidden');
              document.getElementById('menu-wa').classList.remove('hidden');
           }
-          // ROLE: Pimpinan
-          else if(res.role === 'pimpinan') {
-             // Only Review & Profile
+          // ROLE: Komisioner (Hanya view)
+          else if(res.role === 'komisioner') {
+             document.getElementById('menu-review').classList.remove('hidden');
+             document.getElementById('menu-data').classList.remove('hidden');
+          }
+          // ROLE: Kasubbag (Review & Data untuk Subbagnya sendiri)
+          else if(res.role.includes('kasubbag')) {
+             document.getElementById('menu-review').classList.remove('hidden');
+             document.getElementById('menu-data').classList.remove('hidden');
+             
+             // Set default dropdown subbag ke subbag kasubbag
+             const subSelect = document.getElementById('input-subbagian');
+             if(subSelect) {
+                 if(res.role.includes('kul')) subSelect.value = 'kul';
+                 else if(res.role.includes('sdm')) subSelect.value = 'sdm_parmas';
+                 else if(res.role.includes('tek')) subSelect.value = 'tekhum';
+                 else if(res.role.includes('rendatin')) subSelect.value = 'rendatin';
+             }
           }
           // ROLE: Operator
           else {
@@ -721,10 +739,12 @@
              }
           }
 
-          // HIDE FILTER SUB BAGIAN IF OPERATOR
+          // HIDE FILTER SUB BAGIAN JIKA BUKAN SUPERADMIN ATAU KOMISIONER
+          const isGlobalViewer = (res.role === 'superadmin' || res.role === 'komisioner');
           const filterContainer = document.getElementById('filter-subbag-container');
           const dataFilterContainer = document.getElementById('filter-data-subbag-container');
-          if(res.role.includes('operator')) {
+          
+          if(!isGlobalViewer) {
              if(filterContainer) filterContainer.classList.add('hidden');
              if(dataFilterContainer) dataFilterContainer.classList.add('hidden');
           } else {
@@ -783,12 +803,15 @@
         const sortVal = document.getElementById('sort-rev').value;
 
         // Filter Logic
+        const isGlobalViewer = (currentRole === 'superadmin' || currentRole === 'komisioner');
+        
         let filtered = globalEvidenData.filter(row => {
            let pass = true;
            if(fltSearch && !String(row[2]).toLowerCase().includes(fltSearch)) pass = false;
            if(fltTahun !== 'ALL' && String(row[1]) !== fltTahun) pass = false;
-           // Hanya filter subbagian jika user BUKAN operator
-           if(!currentRole.includes('operator')) {
+           
+           // Hanya filter subbagian manual jika user adalah viewer global
+           if(isGlobalViewer) {
               if(fltSub !== 'ALL' && String(row[3]).toLowerCase() !== fltSub) pass = false;
            }
            
@@ -836,13 +859,13 @@
 
             // Evaluator Notes
             let catatanEvaluatorHTML = '';
-            let evaluatorsNotes = history.filter(h => h.action === 'Tolak' || h.action === 'Verifikasi' || h.action.includes('Review Ulang'));
+            let evaluatorsNotes = history.filter(h => h.action === 'Tolak' || h.action === 'Verifikasi');
             
             if (evaluatorsNotes.length > 0) {
                 let noteItems = '';
                 evaluatorsNotes.forEach(note => {
-                   let colorText = note.action === 'Tolak' ? 'text-red-600' : (note.action.includes('Review Ulang') ? 'text-orange-600' : 'text-green-600');
-                   let iCon = note.action === 'Tolak' ? 'fa-times-circle' : (note.action.includes('Review Ulang') ? 'fa-sync' : 'fa-check-circle');
+                   let colorText = note.action === 'Tolak' ? 'text-red-600' : 'text-green-600';
+                   let iCon = note.action === 'Tolak' ? 'fa-times-circle' : 'fa-check-circle';
                    noteItems += `<div class="mb-2 last:mb-0 bg-white p-2 rounded shadow-sm border border-stone-200"><strong class="text-xs uppercase ${colorText}"><i class="fas ${iCon}"></i> ${note.role} (${note.user}) - ${note.action}</strong><p class="text-sm mt-1 text-stone-800">${note.text}</p></div>`;
                 });
                 
@@ -875,29 +898,27 @@
 
             // Action Area
             let actionAreaHTML = '';
-            const isReviewer = (currentRole === 'superadmin' || currentRole === 'pimpinan' || currentRole === 'operator_rendatin');
+            
+            // Cek apakah user saat ini adalah Kasubbag yang TEPAT untuk memverifikasi eviden ini
+            let canVerify = false;
+            if (currentRole === 'kasubbag_kul' && sub === 'kul') canVerify = true;
+            else if (currentRole === 'kasubbag_sdmparmas' && sub === 'sdm_parmas') canVerify = true;
+            else if (currentRole === 'kasubbag_tekhum' && sub === 'tekhum') canVerify = true;
+            else if (currentRole === 'kasubbag_rendatin' && sub === 'rendatin') canVerify = true;
 
-            if (isReviewer && status !== 'Permintaan') {
+            if (canVerify && status !== 'Permintaan') {
                 if (status === 'Verified') {
                    actionAreaHTML = `
                      <div class="mt-6 pt-4 border-t border-stone-200 bg-green-50 p-4 rounded text-center">
                         <h4 class="font-bold text-sm text-green-800 mb-2"><i class="fas fa-check-circle"></i> Eviden Telah Terverifikasi</h4>
-                        <p class="text-xs text-green-700 mb-4">Semua pihak telah menyetujui eviden ini.</p>
-                        
-                        <div class="bg-white p-3 rounded shadow-inner border mb-3 text-left">
-                           <label class="block text-xs font-bold text-stone-600 mb-1">Alasan Review Kembali</label>
-                           <input type="text" id="re-review-reason-${id}" class="w-full border p-2 rounded text-sm" placeholder="Contoh: Ada data baru...">
-                        </div>
-                        <button onclick="submitInlineReview('${id}', 're_review')" class="bg-orange-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-orange-700 shadow w-full">
-                           <i class="fas fa-undo"></i> Ajukan Review Kembali
-                        </button>
+                        <p class="text-xs text-green-700">Eviden ini sudah diverifikasi oleh Kasubbag.</p>
                      </div>
                    `;
                 } else {
                    actionAreaHTML = `
                      <div class="mt-6 pt-4 border-t border-stone-200">
                         <h4 class="font-bold text-sm text-stone-800 mb-2"><i class="fas fa-comment-dots text-orange-600"></i> Berikan Evaluasi Anda</h4>
-                        <textarea id="eval-text-${id}" rows="2" class="w-full border p-3 rounded bg-stone-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm" placeholder="Catatan..."></textarea>
+                        <textarea id="eval-text-${id}" rows="2" class="w-full border p-3 rounded bg-stone-50 focus:bg-white focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm" placeholder="Catatan opsional..."></textarea>
                         <div class="flex gap-2 mt-3 justify-end">
                            <button onclick="submitInlineReview('${id}', 'reject')" class="bg-red-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-red-700 shadow"><i class="fas fa-times"></i> Tolak</button>
                            <button onclick="submitInlineReview('${id}', 'verify')" class="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700 shadow"><i class="fas fa-check"></i> Verifikasi</button>
@@ -905,8 +926,14 @@
                      </div>
                    `;
                 }
-            }
-            else if (!isReviewer) {
+            } else if (currentRole === 'superadmin' || currentRole === 'komisioner') {
+                 // Hanya view, berikan informasi
+                 if (status === 'Verified') {
+                     actionAreaHTML = `<div class="mt-4 pt-4 border-t border-stone-200 text-right"><span class="text-xs text-green-600 font-bold"><i class="fas fa-check"></i> Telah disetujui Kasubbag terkait.</span></div>`;
+                 } else {
+                     actionAreaHTML = `<div class="mt-4 pt-4 border-t border-stone-200 text-right"><span class="text-xs text-stone-500 italic">Menunggu verifikasi Kasubbag terkait.</span></div>`;
+                 }
+            } else if (currentRole.includes('operator')) {
                 if (status === 'Ditolak' || status === 'Permintaan') {
                     actionAreaHTML = `
                       <div class="mt-4 pt-4 border-t border-stone-200 text-right">
@@ -950,14 +977,8 @@
       }
 
       function submitInlineReview(rowId, actionType) {
-         let komentar = "";
-         if(actionType === 're_review') {
-             komentar = document.getElementById(`re-review-reason-${rowId}`).value;
-             if(komentar.trim() === '') { alert('Mohon isikan alasan review kembali.'); return; }
-         } else {
-             komentar = document.getElementById(`eval-text-${rowId}`).value;
-             if (actionType === 'reject' && komentar.trim() === '') { alert('Mohon tuliskan alasan penolakan.'); return; }
-         }
+         let komentar = document.getElementById(`eval-text-${rowId}`).value;
+         if (actionType === 'reject' && komentar.trim() === '') { alert('Mohon tuliskan alasan penolakan.'); return; }
 
          setLoading(true);
          
@@ -989,12 +1010,14 @@
         const fltSub = document.getElementById('flt-data-sub') ? document.getElementById('flt-data-sub').value : 'ALL';
         const sortVal = document.getElementById('sort-data') ? document.getElementById('sort-data').value : 'nama_asc';
 
+        const isGlobalViewer = (currentRole === 'superadmin' || currentRole === 'komisioner');
+
         let filtered = globalEvidenData.filter(row => {
            let pass = true;
            if(fltSearch && !String(row[2]).toLowerCase().includes(fltSearch)) pass = false;
            if(fltTahun !== 'ALL' && String(row[1]) !== fltTahun) pass = false;
            
-           if(!currentRole.includes('operator')) {
+           if(isGlobalViewer) {
               if(fltSub !== 'ALL' && String(row[3]).toLowerCase() !== fltSub) pass = false;
            }
            
@@ -1004,7 +1027,6 @@
               if(fltStatus === 'Ditolak' && st !== 'Ditolak') pass = false;
               if(fltStatus === 'Permintaan' && st !== 'Permintaan' && st !== 'Belum Upload') pass = false;
               if(fltStatus === 'Sudah Upload' && st !== 'Sudah Upload') pass = false;
-              if(fltStatus === 'Direview Sebagian' && st !== 'Direview Sebagian') pass = false;
            }
            return pass;
         });
@@ -1028,7 +1050,9 @@
             
             let btnAction = '';
             if (status === 'Permintaan' || status === 'Ditolak') {
-              btnAction = `<button onclick="prepareUpload('${id}', '${tahun}', '${sub}', '${nama.replace(/'/g,"\\'")}', '${deadline}')" class="bg-orange-600 text-white px-2 py-1 rounded text-xs">Upload</button>`;
+              if (currentRole.includes('operator')) {
+                  btnAction = `<button onclick="prepareUpload('${id}', '${tahun}', '${sub}', '${nama.replace(/'/g,"\\'")}', '${deadline}')" class="bg-orange-600 text-white px-2 py-1 rounded text-xs">Upload</button>`;
+              }
             } else {
               btnAction = `<a href="${link}" target="_blank" class="text-stone-600 hover:text-orange-600"><i class="fas fa-file-download text-lg"></i></a>`;
             }
@@ -1189,7 +1213,7 @@
                  if (rowYear.toString() === year.toString() && rowSub === subbagian) {
                      stats.total++;
                      if (status === 'Verified') stats.verified++;
-                     else if (status === 'Sudah Upload' || status === 'Pending' || status === 'Direview Sebagian') stats.proses++;
+                     else if (status === 'Sudah Upload' || status === 'Pending') stats.proses++;
                      else stats.belum++; // Permintaan, Ditolak, Belum Upload
                  }
              });
