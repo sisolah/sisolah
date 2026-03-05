@@ -384,6 +384,21 @@
       </div>
     </main>
 
+    <!-- CUSTOM GLOBAL MODAL (ALERT & CONFIRM) -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-stone-900 bg-opacity-75 backdrop-blur-sm flex justify-center items-center z-[100] transition-opacity">
+      <div class="bg-white rounded-lg p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-100" id="custom-modal-box">
+        <h3 id="custom-modal-title" class="font-bold text-lg mb-2 text-stone-800 flex items-center">
+            <!-- Icon di-inject via JS -->
+            Pemberitahuan
+        </h3>
+        <p id="custom-modal-message" class="text-sm text-stone-600 mb-6 whitespace-pre-line"></p>
+        <div class="flex justify-end gap-2">
+           <button id="custom-modal-btn-cancel" class="hidden px-4 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold rounded transition text-sm">Batal</button>
+           <button id="custom-modal-btn-ok" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold rounded shadow transition text-sm">OK</button>
+        </div>
+      </div>
+    </div>
+
     <!-- MODAL USER ADMIN -->
     <div id="modal-user" class="hidden fixed inset-0 bg-stone-900 bg-opacity-75 flex justify-center items-center z-[70]">
       <div class="bg-white rounded-lg p-6 w-full max-w-md">
@@ -500,14 +515,72 @@
 
       function setLoading(bool) { document.getElementById('loading').classList.toggle('hidden', !bool); }
 
+      // ==========================================
+      // FUNGSI CUSTOM MODAL PENGGANTI ALERT & CONFIRM
+      // ==========================================
+      function showAlert(title, message, type = 'info') {
+         document.getElementById('custom-modal-title').innerText = title;
+         document.getElementById('custom-modal-message').innerText = message;
+         document.getElementById('custom-modal-btn-cancel').classList.add('hidden');
+         document.getElementById('custom-modal-btn-ok').innerText = "OK";
+         
+         let iconHTML = '';
+         if(type === 'error') iconHTML = '<i class="fas fa-exclamation-circle text-red-500 mr-2 text-xl"></i>';
+         else if(type === 'success') iconHTML = '<i class="fas fa-check-circle text-green-500 mr-2 text-xl"></i>';
+         else if(type === 'warning') iconHTML = '<i class="fas fa-exclamation-triangle text-yellow-500 mr-2 text-xl"></i>';
+         else iconHTML = '<i class="fas fa-info-circle text-blue-500 mr-2 text-xl"></i>';
+         
+         document.getElementById('custom-modal-title').innerHTML = iconHTML + title;
+
+         const okBtn = document.getElementById('custom-modal-btn-ok');
+         const newOkBtn = okBtn.cloneNode(true);
+         okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+         
+         newOkBtn.onclick = function() {
+            document.getElementById('custom-modal').classList.add('hidden');
+         };
+
+         document.getElementById('custom-modal').classList.remove('hidden');
+      }
+
+      function showConfirm(title, message, onConfirmCallback) {
+         document.getElementById('custom-modal-title').innerText = title;
+         document.getElementById('custom-modal-message').innerText = message;
+         document.getElementById('custom-modal-btn-cancel').classList.remove('hidden');
+         document.getElementById('custom-modal-btn-ok').innerText = "Ya, Lanjutkan";
+         
+         document.getElementById('custom-modal-title').innerHTML = '<i class="fas fa-question-circle text-orange-500 mr-2 text-xl"></i>' + title;
+
+         const okBtn = document.getElementById('custom-modal-btn-ok');
+         const cancelBtn = document.getElementById('custom-modal-btn-cancel');
+         
+         const newOkBtn = okBtn.cloneNode(true);
+         okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+         
+         const newCancelBtn = cancelBtn.cloneNode(true);
+         cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+         newOkBtn.onclick = function() {
+            document.getElementById('custom-modal').classList.add('hidden');
+            if(typeof onConfirmCallback === 'function') onConfirmCallback();
+         };
+         
+         newCancelBtn.onclick = function() {
+            document.getElementById('custom-modal').classList.add('hidden');
+         };
+
+         document.getElementById('custom-modal').classList.remove('hidden');
+      }
+
+
       // Fungsi Penanganan Error Global
       function handleSystemError(err) {
           setLoading(false);
-          alert("Kesalahan Sistem: " + err.message + "\n\nPastikan Anda telah mengisi URL Web App GAS pada baris 'URL_GAS_ANDA_DISINI'");
+          showAlert("Kesalahan Sistem", err.message + "\n\nPastikan Anda telah mengisi URL Web App GAS pada baris 'URL_GAS_ANDA_DISINI'", 'error');
       }
 
       // ==========================================
-      // FUNGSI BYPASS KIRIM WA LANGSUNG DARI BROWSER (ANTI LEMOT & PASTI BERHASIL)
+      // FUNGSI BYPASS KIRIM WA LANGSUNG DARI BROWSER
       // ==========================================
       async function sendFonnteDirectly(targetsArray, message) {
           if (!targetsArray || targetsArray.length === 0) return { status: 'error', message: 'Tidak ada nomor tujuan.' };
@@ -675,7 +748,9 @@
                 setLoginState(res);
                 
                 showPage('page-home');
-              } else alert(res.message);
+              } else {
+                 showAlert('Gagal Login', res.message, 'error');
+              }
           })
           .catch(handleSystemError);
       }
@@ -978,7 +1053,10 @@
 
       function submitInlineReview(rowId, actionType) {
          let komentar = document.getElementById(`eval-text-${rowId}`).value;
-         if (actionType === 'reject' && komentar.trim() === '') { alert('Mohon tuliskan alasan penolakan.'); return; }
+         if (actionType === 'reject' && komentar.trim() === '') { 
+            showAlert('Peringatan', 'Mohon tuliskan alasan penolakan.', 'warning'); 
+            return; 
+         }
 
          setLoading(true);
          
@@ -992,7 +1070,7 @@
 
          callBackendAPI('reviewEvidence', payload)
            .then(res => {
-              alert(res.message);
+              showAlert('Berhasil', res.message, 'success');
               loadGlobalData(); 
            })
            .catch(handleSystemError);
@@ -1122,7 +1200,7 @@
           setLoading(true);
           callBackendAPI('uploadEvidence', { formObject: formObject, fileData: fileData, userRole: currentRole })
             .then(res => {
-              alert(res.message);
+              showAlert('Pemberitahuan', res.message, res.status === 'success' ? 'success' : 'error');
               document.getElementById('form-upload').reset();
               document.getElementById('upload-instruction').classList.add('hidden');
               document.getElementById('input-tahun').disabled = false;
@@ -1143,7 +1221,7 @@
 
         callBackendAPI('requestEvidence', { formObject: formObj })
           .then(res => {
-             alert(res.message); 
+             showAlert('Pemberitahuan', res.message, res.status === 'success' ? 'success' : 'error');
              e.target.reset(); 
              loadGlobalData();
           })
@@ -1151,117 +1229,117 @@
       }
 
       // --- WHATSAPP NOTIFICATIONS ---
-      async function handleSendManualWA(e) {
+      function handleSendManualWA(e) {
          e.preventDefault();
          const targetSub = document.getElementById('wa-target').value;
          const message = document.getElementById('wa-message').value;
 
-         if (!confirm('Anda yakin ingin mengirim pesan WhatsApp ini secara manual?')) return;
-
-         setLoading(true);
-         try {
-             // 1. Ambil data User dari GAS untuk mencari Nomor HP
-             const users = await callBackendAPI('getAllUsers', {});
-             
-             // 2. Filter nomor tujuan
-             let targets = [];
-             users.forEach(u => {
-                 let role = String(u[4]).toLowerCase();
-                 let hp = String(u[3]).trim();
-                 if (hp && hp !== '-' && hp !== '') {
-                     if (targetSub === 'all' && role.includes('operator')) {
-                         targets.push(hp);
-                     } else if (targetSub !== 'all' && role.includes(targetSub.replace('_', ''))) {
-                         targets.push(hp);
+         showConfirm('Konfirmasi Kirim', 'Anda yakin ingin mengirim pesan WhatsApp ini secara manual?', async () => {
+             setLoading(true);
+             try {
+                 // 1. Ambil data User dari GAS untuk mencari Nomor HP
+                 const users = await callBackendAPI('getAllUsers', {});
+                 
+                 // 2. Filter nomor tujuan
+                 let targets = [];
+                 users.forEach(u => {
+                     let role = String(u[4]).toLowerCase();
+                     let hp = String(u[3]).trim();
+                     if (hp && hp !== '-' && hp !== '') {
+                         if (targetSub === 'all' && role.includes('operator')) {
+                             targets.push(hp);
+                         } else if (targetSub !== 'all' && role.includes(targetSub.replace('_', ''))) {
+                             targets.push(hp);
+                         }
                      }
+                 });
+
+                 if (targets.length === 0) {
+                     setLoading(false);
+                     showAlert('Peringatan', 'Gagal: Tidak ada Nomor HP terdaftar untuk target kategori ini.', 'warning');
+                     return;
                  }
-             });
 
-             if (targets.length === 0) {
+                 // 3. Kirim LANGSUNG ke Fonnte dari browser
+                 const result = await sendFonnteDirectly(targets, message);
                  setLoading(false);
-                 alert(`Gagal: Tidak ada Nomor HP terdaftar untuk target kategori ini.`);
-                 return;
+                 showAlert('Pemberitahuan', result.message, result.status === 'success' ? 'success' : 'error');
+                 if (result.status === 'success') {
+                     document.getElementById('form-wa').reset();
+                 }
+             } catch (error) {
+                 handleSystemError(error);
              }
-
-             // 3. Kirim LANGSUNG ke Fonnte dari browser
-             const result = await sendFonnteDirectly(targets, message);
-             setLoading(false);
-             alert(result.message);
-             if (result.status === 'success') {
-                 document.getElementById('form-wa').reset();
-             }
-         } catch (error) {
-             handleSystemError(error);
-         }
+         });
       }
 
-      async function handleSendProgressWA(subbagian) {
+      function handleSendProgressWA(subbagian) {
          const year = document.getElementById('wa-progress-year').value;
          let subName = subbagian.toUpperCase().replace('_', ' & ');
 
-         if (!confirm(`Kirim Laporan Progres SAKIP Tahun ${year} ke WhatsApp operator Sub Bagian ${subName}?`)) return;
+         showConfirm('Konfirmasi Broadcast', `Kirim Laporan Progres SAKIP Tahun ${year} ke WhatsApp operator Sub Bagian ${subName}?`, async () => {
+             setLoading(true);
+             try {
+                 // 1. Hitung progres LANGSUNG di browser
+                 let stats = { total: 0, verified: 0, proses: 0, belum: 0 };
+                 globalEvidenData.forEach(row => {
+                     let rowYear = row[1];
+                     let rowSub = String(row[3]).toLowerCase();
+                     let status = row[8];
 
-         setLoading(true);
-         try {
-             // 1. Hitung progres LANGSUNG di browser
-             let stats = { total: 0, verified: 0, proses: 0, belum: 0 };
-             globalEvidenData.forEach(row => {
-                 let rowYear = row[1];
-                 let rowSub = String(row[3]).toLowerCase();
-                 let status = row[8];
+                     if (rowYear.toString() === year.toString() && rowSub === subbagian) {
+                         stats.total++;
+                         if (status === 'Verified') stats.verified++;
+                         else if (status === 'Sudah Upload' || status === 'Pending') stats.proses++;
+                         else stats.belum++; // Permintaan, Ditolak, Belum Upload
+                     }
+                 });
 
-                 if (rowYear.toString() === year.toString() && rowSub === subbagian) {
-                     stats.total++;
-                     if (status === 'Verified') stats.verified++;
-                     else if (status === 'Sudah Upload' || status === 'Pending') stats.proses++;
-                     else stats.belum++; // Permintaan, Ditolak, Belum Upload
+                 if (stats.total === 0) {
+                     setLoading(false);
+                     showAlert('Peringatan', `Tidak ada data eviden untuk ${subName} pada tahun ${year}.`, 'warning');
+                     return;
                  }
-             });
 
-             if (stats.total === 0) {
+                 let message = `*[LAPORAN PROGRES SAKIP]*\n`;
+                 message += `Tahun: ${year}\n`;
+                 message += `Sub Bagian: ${subName}\n\n`;
+                 message += `📊 *Ringkasan Status:*\n`;
+                 message += `- Total Eviden: ${stats.total}\n`;
+                 message += `- ✅ Terverifikasi: ${stats.verified}\n`;
+                 message += `- ⏳ Proses Upload/Review: ${stats.proses}\n`;
+                 message += `- ❌ Belum/Ditolak: ${stats.belum}\n\n`;
+                 message += `Mohon segera menindaklanjuti eviden yang masih berstatus proses atau belum selesai.\nTerima kasih.`;
+
+                 // 2. Ambil data User dari GAS untuk dapat No HP
+                 const users = await callBackendAPI('getAllUsers', {});
+                 
+                 let targets = [];
+                 users.forEach(u => {
+                    let role = String(u[4]).toLowerCase();
+                    let hp = String(u[3]).trim();
+                    if (hp && hp !== '-' && hp !== '') {
+                       if (role.includes(subbagian.replace('_', ''))) {
+                          targets.push(hp);
+                       }
+                    }
+                 });
+
+                 if (targets.length === 0) {
+                     setLoading(false);
+                     showAlert('Peringatan', `Gagal: Tidak ada Nomor HP terdaftar untuk Sub Bagian ${subName}.`, 'warning');
+                     return;
+                 }
+
+                 // 3. Kirim LANGSUNG ke Fonnte dari browser
+                 const result = await sendFonnteDirectly(targets, message);
                  setLoading(false);
-                 alert(`Tidak ada data eviden untuk ${subName} pada tahun ${year}.`);
-                 return;
+                 showAlert('Pemberitahuan', result.message, result.status === 'success' ? 'success' : 'error');
+
+             } catch (error) {
+                 handleSystemError(error);
              }
-
-             let message = `*[LAPORAN PROGRES SAKIP]*\n`;
-             message += `Tahun: ${year}\n`;
-             message += `Sub Bagian: ${subName}\n\n`;
-             message += `📊 *Ringkasan Status:*\n`;
-             message += `- Total Eviden: ${stats.total}\n`;
-             message += `- ✅ Terverifikasi: ${stats.verified}\n`;
-             message += `- ⏳ Proses Upload/Review: ${stats.proses}\n`;
-             message += `- ❌ Belum/Ditolak: ${stats.belum}\n\n`;
-             message += `Mohon segera menindaklanjuti eviden yang masih berstatus proses atau belum selesai.\nTerima kasih.`;
-
-             // 2. Ambil data User dari GAS untuk dapat No HP
-             const users = await callBackendAPI('getAllUsers', {});
-             
-             let targets = [];
-             users.forEach(u => {
-                let role = String(u[4]).toLowerCase();
-                let hp = String(u[3]).trim();
-                if (hp && hp !== '-' && hp !== '') {
-                   if (role.includes(subbagian.replace('_', ''))) {
-                      targets.push(hp);
-                   }
-                }
-             });
-
-             if (targets.length === 0) {
-                 setLoading(false);
-                 alert(`Gagal: Tidak ada Nomor HP terdaftar untuk Sub Bagian ${subName}.`);
-                 return;
-             }
-
-             // 3. Kirim LANGSUNG ke Fonnte dari browser
-             const result = await sendFonnteDirectly(targets, message);
-             setLoading(false);
-             alert(result.message);
-
-         } catch (error) {
-             handleSystemError(error);
-         }
+         });
       }
 
       // --- DASHBOARD CHARTS ---
@@ -1308,7 +1386,7 @@
         callBackendAPI('changePassword', { username: currentUser, newPass: p })
           .then(res => { 
               setLoading(false); 
-              alert(res.message); 
+              showAlert('Pemberitahuan', res.message, res.status === 'success' ? 'success' : 'error'); 
           })
           .catch(handleSystemError);
       }
@@ -1382,7 +1460,7 @@
         callBackendAPI('manageUser', { actionType: action, userData: u, oldUsername: oldUser })
           .then(res => {
               setLoading(false);
-              alert(res.message); 
+              showAlert('Pemberitahuan', res.message, res.status === 'success' ? 'success' : 'error'); 
               if(res.status === 'success') {
                   document.getElementById('modal-user').classList.add('hidden'); 
                   loadUsers();
@@ -1392,16 +1470,16 @@
       }
 
       function deleteUser(user) { 
-        if(confirm('Hapus User ini?')) {
+        showConfirm('Konfirmasi Hapus', 'Apakah Anda yakin ingin menghapus User ini?', () => {
             setLoading(true);
             callBackendAPI('manageUser', { actionType: 'delete', userData: null, oldUsername: user })
               .then(res => {
                   setLoading(false);
-                  alert(res.message);
+                  showAlert('Pemberitahuan', res.message, res.status === 'success' ? 'success' : 'error');
                   loadUsers();
               })
               .catch(handleSystemError);
-        }
+        });
       }
 
       // --- EDIT EVIDEN (SUPERADMIN ONLY) ---
@@ -1429,13 +1507,13 @@
         setLoading(true);
         callBackendAPI('updateEvidenceData', { id: id, newData: newData, operator: currentUser })
           .then(res => {
+              setLoading(false);
               if(res.status === 'success') {
-                 alert(res.message);
+                 showAlert('Berhasil', res.message, 'success');
                  document.getElementById('modal-edit-eviden').classList.add('hidden');
                  loadGlobalData(); // Refresh UI setelah menyimpan
               } else {
-                 setLoading(false);
-                 alert(res.message);
+                 showAlert('Gagal', res.message, 'error');
               }
           })
           .catch(handleSystemError);
